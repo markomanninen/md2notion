@@ -25,7 +25,7 @@ Example Usage:
     markdown_text = "# My Page\\nThis is a Notion page created from Markdown."
     title = "My Notion Page"
     parent_page_id = "YOUR_PARENT_PAGE_ID"
-    notion_page_url = create_notion_page_from_md(markdown_text, title, parent_page_id)
+    notion_page_url = md2notion(markdown_text, title, parent_page_id)
 """
 
 import os, re, glob, base64, json
