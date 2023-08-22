@@ -11,8 +11,6 @@ Functions:
 
 Dependencies:
     - notion_client: Client library for interacting with the Notion API.
-    - mistune: Markdown parser.
-    - html2text: HTML to Markdown converter.
     - re: Regular expressions module.
     - os: Operating system interfaces module.
     - json: JSON encoder and decoder module.
