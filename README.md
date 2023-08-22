@@ -29,8 +29,6 @@ notion_page_url = md2notion(markdown_text, title, parent_page_id)
 ## Dependencies
 
 - notion-client
-- mistune
-- html2text
 
 ## Environment Variables
 
