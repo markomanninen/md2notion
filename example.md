@@ -20,5 +20,5 @@ Taulukko:
 | Sisältö  | Sisältö  | Sisältö  |
 ---
 Vaakaviiva
-![Kuvateksti](https://www.example.com/image.jpg)
+![Kuvateksti](https://raw.githubusercontent.com/markomanninen/md2notion/main/photo-1501504905252-473c47e087f8.jpeg)
 Tämä on monipuolinen esimerkki, joka sisältää useimmat yleiset Markdown-elementit.
