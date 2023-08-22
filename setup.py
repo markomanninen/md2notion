@@ -5,9 +5,7 @@ setup(
     version='0.1.0',
     packages=find_packages(),
     install_requires=[
-        'notion-client',
-        'mistune',
-        'html2text'
+        'notion-client'
     ],
     author='Marko T. Manninen',
     description='A package to convert Markdown to Notion data structure and publish a new page under the parent page',
