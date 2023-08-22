@@ -253,7 +253,7 @@ def create_notion_page_from_md(markdown_text, title, parent_page_id, cover_url='
 	        }
 	    }, cover = {
 			"external": {
-				# Example URL: https://images.unsplash.com/photo-1507838153414-b4b713384a76?ixlib=rb-4.0.3&q=80&fm=jpg&crop=entropy&cs=tinysrgb&w=3600
+				# Example URL: https://raw.githubusercontent.com/markomanninen/md2notion/main/photo-1501504905252-473c47e087f8.jpeg
 				"url": cover_url
 			}
 		})
