@@ -29,7 +29,6 @@ Example Usage:
 """
 
 import os, re, glob, base64, json
-import mistune, html2text
 from notion_client import Client
 from os import environ
 
@@ -222,15 +221,8 @@ def parse_md(markdown_text):
     # Remove the first two lines of the Markdown text
     markdown_text = '\n'.join(markdown_text.splitlines()[2:]).strip()
 
-    # Convert the Markdown text to HTML using mistune
-    html_text = mistune.markdown(markdown_text)
-
-    # Convert the HTML back to Markdown using html2text
-    # This step may be used to transform the HTML into a Markdown format compatible with Notion
-    markdown_to_notion = html2text.html2text(html_text)
-
     # Parse the transformed Markdown to create Notion blocks
-    return parse_markdown_to_notion_blocks(markdown_to_notion)
+    return parse_markdown_to_notion_blocks(markdown_text)
 
 
 def create_notion_page_from_md(markdown_text, title, parent_page_id, cover_url=''):
