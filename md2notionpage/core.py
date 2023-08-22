@@ -19,11 +19,11 @@ Environment Variables:
     - NOTION_SECRET: Authentication token for the Notion API.
 
 Example Usage:
-    from md2notion import md2notion
+    from md2notionpage import md2notionpage
     markdown_text = "# My Page\\nThis is a Notion page created from Markdown."
     title = "My Notion Page"
     parent_page_id = "YOUR_PARENT_PAGE_ID"
-    notion_page_url = md2notion(markdown_text, title, parent_page_id)
+    notion_page_url = md2notionpage(markdown_text, title, parent_page_id)
 """
 
 import os, re, glob, base64, json
@@ -269,4 +269,3 @@ def create_notion_page_from_md(markdown_text, title, parent_page_id, cover_url='
         )
 
     return created_page["url"]
-

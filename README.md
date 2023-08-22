@@ -1,5 +1,5 @@
 
-# md2notion
+# md2notionpage
 
 A Python package to convert Markdown text into Notion pages. This module provides functionality to create Notion pages from Markdown text, parse Markdown into Notion blocks, and process inline formatting.
 
@@ -8,22 +8,22 @@ A Python package to convert Markdown text into Notion pages. This module provide
 You can install the package using pip:
 
 ```bash
-pip install md2notion
+pip install md2notionpage
 ```
 
 ## Usage
 
-Here's a basic example of how to use the `md2notion` function:
+Here's a basic example of how to use the `md2notionpage` function:
 
 ```python
-from md2notion import md2notion
+from md2notionpage import md2notionpage
 markdown_text = """
 # My Page
 This is a Notion page created from Markdown.
 """
 title = 'My Notion Page'
 parent_page_id = 'YOUR_PARENT_PAGE_ID'
-notion_page_url = md2notion(markdown_text, title, parent_page_id)
+notion_page_url = md2notionpage(markdown_text, title, parent_page_id)
 ```
 
 ## Dependencies
