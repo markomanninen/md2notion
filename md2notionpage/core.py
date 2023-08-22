@@ -245,21 +245,25 @@ def create_notion_page_from_md(markdown_text, title, parent_page_id, cover_url='
         "page_id": parent_page_id
     }, properties={}, children=[])
 
-    cover = {}
-    if cover_url != "":
-        cover = {
-            "external": {
-                # Example URL: https://images.unsplash.com/photo-1507838153414-b4b713384a76?ixlib=rb-4.0.3&q=80&fm=jpg&crop=entropy&cs=tinysrgb&w=3600
-                "url": cover_url
-            }
-        }
-
-    # Update the page with the title and cover (if provided)
-    notion.pages.update(created_page["id"], properties={
-        "title": {
-            "title": [{"type": "text", "text": {"content": title}}]
-        }
-    }, cover=cover)
+	if cover_url != "":
+		# Update the page with the title and cover (if provided)
+	    notion.pages.update(created_page["id"], properties={
+	        "title": {
+	            "title": [{"type": "text", "text": {"content": title}}]
+	        }
+	    }, cover = {
+			"external": {
+				# Example URL: https://images.unsplash.com/photo-1507838153414-b4b713384a76?ixlib=rb-4.0.3&q=80&fm=jpg&crop=entropy&cs=tinysrgb&w=3600
+				"url": cover_url
+			}
+		})
+	else:
+	    # Update the page with the title and cover (if provided)
+	    notion.pages.update(created_page["id"], properties={
+	        "title": {
+	            "title": [{"type": "text", "text": {"content": title}}]
+	        }
+	    })
 
     # Iterate through the parsed Markdown blocks and append them to the created page
     for block in parse_md(markdown_text):
