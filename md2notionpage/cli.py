@@ -16,9 +16,9 @@ def main():
 
     try:
         # Read the Markdown content from the file
-        with open(args.markdown_file, 'r') as file:
+        with open(args.markdown_file, 'r', encoding='utf-8') as file:
             markdown_content = file.read()
-        
+
         # If title is not given, take it from the file base name
         title = args.title if args.title else os.path.splitext(os.path.basename(args.markdown_file))[0]
 
