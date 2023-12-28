@@ -209,9 +209,9 @@ def process_inline_formatting(text):
         prev_end = match.end()
     text_parts.append(text[prev_end:])
 
+    text_parts = replace_part(text_parts, inline_katex_pattern, replace_katex)
     text_parts = replace_part(text_parts, bold_pattern, replace_bold)
     text_parts = replace_part(text_parts, italic_pattern, replace_italic)
-    text_parts = replace_part(text_parts, inline_katex_pattern, replace_katex)
     text_parts = replace_part(text_parts, overline_pattern, replace_overline)
     text_parts = replace_part(text_parts, code_pattern, replace_code)
     text_parts = replace_part(text_parts, link_pattern, replace_link)
