@@ -336,66 +336,102 @@ def parse_markdown_to_notion_blocks(markdown):
             current_table = []
             continue
 
+        # --- 1. Ordered list processing ---
         list_match = re.match(numbered_list_pattern_nested, line)
         if list_match:
             indent = len(list_match.group(1))
-            line = line[len(list_match.group(0)):]
+            line_content = line[len(list_match.group(0)):]
 
             item = {
                 "object": "block",
                 "type": "numbered_list_item",
                 "numbered_list_item": {
-                    "rich_text": process_inline_formatting(line)
-                }
+                    "rich_text": process_inline_formatting(line_content)
+                },
+                # Explicitly save indent for finding the new current_indent upon dedentation (pop)
+                'indent': indent 
             }
 
             while indent < current_indent:
-                # If the indentation is less than the current level, go back one level in the stack
                 stack.pop()
-                current_indent -= 1
+                if stack and stack[-1] and 'indent' in stack[-1][-1]:
+                    current_indent = stack[-1][-1]['indent']
+                else:
+                    current_indent = 0
 
             if indent == current_indent:
-                # Same level of indentation, add to the current level of the stack
                 stack[-1].append(item)
-            else: # indent > current_indent
-                # Nested item, add it as a child of the previous item
-                if 'children' not in stack[-1][-1]['numbered_list_item']:
-                    stack[-1][-1]['numbered_list_item']['children'] = []
-                stack[-1][-1]['numbered_list_item']['children'].append(item)
-                stack.append(stack[-1][-1]['numbered_list_item']['children']) # Add a new level to the stack
-                current_indent += 1
 
+            elif indent > current_indent:
+                current_block = stack[-1][-1] 
+                content_key = current_block.get('type') 
+                
+                # Core logic: Any valid Block can have children
+                if content_key and content_key in current_block:
+                    
+                    # 1. Ensure the target Block's inner content dictionary has a 'children' list
+                    if 'children' not in current_block[content_key]:
+                        current_block[content_key]['children'] = []
+                    
+                    # 2. Append the new list item to 'children'
+                    current_block[content_key]['children'].append(item)
+                    
+                    # 3. Push the new 'children' list onto the stack
+                    stack.append(current_block[content_key]['children'])
+                    current_indent = indent
+                else:
+                    # This indicates the top Block on the stack is invalid or malformed.
+                    print(f"Warning: Invalid top Block structure ({current_block}: {line_content}). Cannot nest. Falling back to sibling.")
+                    stack[-1].append(item) 
             continue
 
+        # --- 2. Unordered list processing ---
         list_match = re.match(unordered_list_pattern_nested, line)
         if list_match:
             indent = len(list_match.group(1))
-            line = line[len(list_match.group(0)):]
+            line_content = line[len(list_match.group(0)):]
 
             item = {
                 "object": "block",
                 "type": "bulleted_list_item",
                 "bulleted_list_item": {
-                    "rich_text": process_inline_formatting(line)
-                }
+                    "rich_text": process_inline_formatting(line_content)
+                },
+                # Explicitly save indent for finding the new current_indent upon dedentation (pop)
+                'indent': indent 
             }
 
             while indent < current_indent:
-                # If the indentation is less than the current level, go back one level in the stack
                 stack.pop()
-                current_indent -= 1
+                if stack and stack[-1] and 'indent' in stack[-1][-1]:
+                    current_indent = stack[-1][-1]['indent']
+                else:
+                    current_indent = 0
 
             if indent == current_indent:
-                # Same level of indentation, add to the current level of the stack
                 stack[-1].append(item)
-            else: # indent > current_indent
-                # Nested item, add it as a child of the previous item
-                if 'children' not in stack[-1][-1]['bulleted_list_item']:
-                    stack[-1][-1]['bulleted_list_item']['children'] = []
-                stack[-1][-1]['bulleted_list_item']['children'].append(item)
-                stack.append(stack[-1][-1]['bulleted_list_item']['children']) # Add a new level to the stack
-                current_indent += 1
 
+            elif indent > current_indent:
+                current_block = stack[-1][-1] 
+                content_key = current_block.get('type') 
+                
+                # Core logic: Any valid Block can have children
+                if content_key and content_key in current_block:
+                    
+                    # 1. Ensure the target Block's inner content dictionary has a 'children' list
+                    if 'children' not in current_block[content_key]:
+                        current_block[content_key]['children'] = []
+                    
+                    # 2. Append the new list item to 'children'
+                    current_block[content_key]['children'].append(item)
+                    
+                    # 3. Push the new 'children' list onto the stack
+                    stack.append(current_block[content_key]['children'])
+                    current_indent = indent
+                else:
+                    # This indicates the top Block on the stack is invalid or malformed.
+                    print(f"Warning: Invalid top Block structure ({current_block}: {line_content}). Cannot nest. Falling back to sibling.")
+                    stack[-1].append(item) 
             continue
 
         if line.startswith('    '):  # Check if the line is indented
