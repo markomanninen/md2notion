@@ -567,7 +567,21 @@ def parse_markdown_to_notion_blocks(markdown):
                 "rich_text": [{"type": "text", "text": {"content": code_block}}]
             }
         })
-
+    # Final cleanup step: Remove all top-level 'indent' properties before returning
+    def _clean_blocks(blocks):
+        """Recursively removes the top-level 'indent' property from all blocks and their children."""
+        for block in blocks:
+            if 'indent' in block:
+                del block['indent']
+                
+            # Check for nested children (e.g., within paragraph or list_item content)
+            block_type = block.get('type')
+            if block_type and block_type in block:
+                content = block[block_type]
+                if 'children' in content and isinstance(content['children'], list):
+                    _clean_blocks(content['children'])
+        return blocks
+    blocks = _clean_blocks(blocks)
     return blocks
 
 def parse_md(markdown_text):
