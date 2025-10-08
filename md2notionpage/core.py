@@ -340,13 +340,13 @@ def parse_markdown_to_notion_blocks(markdown):
         list_match = re.match(numbered_list_pattern_nested, line)
         if list_match:
             indent = len(list_match.group(1))
-            line_content = line[len(list_match.group(0)):]
+            line = line[len(list_match.group(0)):]
 
             item = {
                 "object": "block",
                 "type": "numbered_list_item",
                 "numbered_list_item": {
-                    "rich_text": process_inline_formatting(line_content)
+                    "rich_text": process_inline_formatting(line)
                 },
                 # Explicitly save indent for finding the new current_indent upon dedentation (pop)
                 'indent': indent 
@@ -381,7 +381,7 @@ def parse_markdown_to_notion_blocks(markdown):
                     current_indent = indent
                 else:
                     # This indicates the top Block on the stack is invalid or malformed.
-                    print(f"Warning: Invalid top Block structure ({current_block}: {line_content}). Cannot nest. Falling back to sibling.")
+                    print(f"Warning: Invalid top Block structure ({current_block}: {line}). Cannot nest. Falling back to sibling.")
                     stack[-1].append(item) 
             continue
 
@@ -389,13 +389,13 @@ def parse_markdown_to_notion_blocks(markdown):
         list_match = re.match(unordered_list_pattern_nested, line)
         if list_match:
             indent = len(list_match.group(1))
-            line_content = line[len(list_match.group(0)):]
+            line = line[len(list_match.group(0)):]
 
             item = {
                 "object": "block",
                 "type": "bulleted_list_item",
                 "bulleted_list_item": {
-                    "rich_text": process_inline_formatting(line_content)
+                    "rich_text": process_inline_formatting(line)
                 },
                 # Explicitly save indent for finding the new current_indent upon dedentation (pop)
                 'indent': indent 
@@ -430,7 +430,7 @@ def parse_markdown_to_notion_blocks(markdown):
                     current_indent = indent
                 else:
                     # This indicates the top Block on the stack is invalid or malformed.
-                    print(f"Warning: Invalid top Block structure ({current_block}: {line_content}). Cannot nest. Falling back to sibling.")
+                    print(f"Warning: Invalid top Block structure ({current_block}: {line}). Cannot nest. Falling back to sibling.")
                     stack[-1].append(item) 
             continue
 
