@@ -122,6 +122,7 @@ You can create a blockquote using `>`:
 ## Tables
 
 You can create tables with or without header rows. They will become LaTeX/KaTeX tables or Notion tables in the Notion page.
+
 A switch parameter is_latex_table added to parse_md and create_notion_page_from_md functions in core.py. The default is_latex_table=True, and the original call is not affected.
 
 ### Table with Headers
