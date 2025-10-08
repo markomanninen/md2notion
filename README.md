@@ -29,7 +29,7 @@ parent_page_id = 'YOUR_PARENT_PAGE_ID'
 
 notion_page_url = md2notionpage(markdown_text, title, parent_page_id)
 ```
- Or calling the core function of convert markdown to notion blocks in your own function, and implement the logic of other notation operations yourself
+ Or calling the core function of convert markdown to notion blocks in your own function, and implement the logic of other notation operations yourself:
  ```python
 from notion_client import Client as Notion
 from md2notionpage import md2notion_parse_md
@@ -38,7 +38,8 @@ def create_page(title, industry, language, date_str, md_content=None):
 
 	notion = Notion(auth=NOTION_API_KEY, notion_version=NOTION_VERSION) # Define your env parameters
 
-	children = md2notion_parse_md(md_content, is_latex_table=False) if md_content else [] # is_latex_table = False means Markdown Table concerted to Notion Table instead of LaTeX Table
+	# is_latex_table = False means Markdown Table concerted to Notion Table instead of LaTeX Table
+	children = md2notion_parse_md(md_content, is_latex_table=False) if md_content else []
 
 	properties = {
 		 "Name": {"title": [{"type": "text", "text": {"content": title}}]},
@@ -46,11 +47,11 @@ def create_page(title, industry, language, date_str, md_content=None):
 		 "Language": {"rich_text": [{"type": "text", "text": {"content": language}}]},
 		 "Create Date": {"rich_text": [{"type": "text", "text": {"content": date_str + "UTC"}}]}
 	} 
-	 resp = notion.pages.create(
+	resp = notion.pages.create(
 	 	parent={"database_id": NOTION_DATABASE_ID},
 	 	properties=properties,
 	 	children=children
-	 )
+	)
 ```
 # Supported Markdown Features
 
