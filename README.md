@@ -1,7 +1,7 @@
 
 # md2notionpage
 
-A Python package to convert Markdown text into Notion pages. This module provides functionality to create Notion pages from Markdown text, parse Markdown into Notion blocks, and process inline formatting.
+A Python package to convert Markdown text into Notion Blocks pages. This module provides functionality to create Notion pages from Markdown text, parse Markdown into Notion blocks, and process inline formatting.
 
 ## Installation
 
@@ -29,7 +29,29 @@ parent_page_id = 'YOUR_PARENT_PAGE_ID'
 
 notion_page_url = md2notionpage(markdown_text, title, parent_page_id)
 ```
+ Or calling the core function of convert markdown to notion blocks in your own function, and implement the logic of other notation operations yourself
+ ```python
+from notion_client import Client as Notion
+from md2notionpage import md2notion_parse_md
 
+def create_page(title, industry, language, date_str, md_content=None):
+
+	notion = Notion(auth=NOTION_API_KEY, notion_version=NOTION_VERSION) # Define your env parameters
+
+	children = md2notion_parse_md(md_content, is_latex_table=False) if md_content else [] # is_latex_table = False means Markdown Table concerted to Notion Table instead of LaTeX Table
+
+	properties = {
+		 "Name": {"title": [{"type": "text", "text": {"content": title}}]},
+		 "Industry": {"rich_text": [{"type": "text", "text": {"content": industry}}]},
+		 "Language": {"rich_text": [{"type": "text", "text": {"content": language}}]},
+		 "Create Date": {"rich_text": [{"type": "text", "text": {"content": date_str + "UTC"}}]}
+	} 
+	 resp = notion.pages.create(
+	 	parent={"database_id": NOTION_DATABASE_ID},
+	 	properties=properties,
+	 	children=children
+	 )
+```
 # Supported Markdown Features
 
 ## Headings
@@ -98,7 +120,8 @@ You can create a blockquote using `>`:
 
 ## Tables
 
-You can create tables with or without header rows. They will become LaTeX/KaTeX tables in the Notion page.
+You can create tables with or without header rows. They will become LaTeX/KaTeX tables or Notion tables in the Notion page.
+A switch parameter is_latex_table added to parse_md and create_notion_page_from_md functions in core.py. The default is_latex_table=True, and the original call is not affected.
 
 ### Table with Headers
 
