@@ -249,8 +249,88 @@ def convert_markdown_table_to_latex(text):
     add_table = f"\\def\\arraystretch{{1.4}}\\begin{{array}}{{{table_column}|}}\\hline\n{table_content}\\end{{array}}"
 
     return add_table
+    
+def convert_markdown_table_to_notion(md_table_string: str):
+    """
+    Converts a Markdown table string into a Notion API Table Block object,
+    mimicking the line-by-line processing of the LaTeX function.
+    """
+    import re # Assuming re module is available
 
-def parse_markdown_to_notion_blocks(markdown):
+    # 1. Split and clean by line (split_column = text.split('\n'))
+    split_column = [line.strip() for line in md_table_string.strip().split('\n') if line.strip()]
+    if not split_column:
+        return None
+
+    has_header_row = False
+
+    # 2. Identify and remove the separator line (if re.match... pop(1))
+    # Check if the second line is a separator line (|---|:---|---:|)
+    if len(split_column) > 1 and re.match(r'^\|[\s:-]+\|[\s:-]+\|', split_column[1]):
+        split_column.pop(1)
+        # Determine that the first line is the header
+        has_header_row = True
+
+    if not split_column:
+        return None
+
+    table_rows = []
+
+    # 3. Loop through each data row (for i, row in enumerate(split_column))
+    for i, row in enumerate(split_column):
+        # Emulating: extract cell content (re.findall(r'(?<=\|).*?(?=\|)', row))
+        # Use a more robust method: remove leading/trailing '|', then split by unescaped '|'
+        # Note: Notion Table Cell doesn't distinguish header/body; it's marked in the parent block as has_header_row
+
+        cells = [cell.strip() for cell in re.split(r'(?<!\\)\|', row.strip('|'))]
+
+        # Filter empty cells to ensure structural integrity
+        cells = [cell if cell else '' for cell in cells]
+
+        notion_cells = []
+        # 4. Format cell content (for j, cell in enumerate(modified_content))
+        for cell_content in cells:
+            # Assume process_inline_formatting function exists to handle content, supporting links, bold, etc.
+            # This function is not defined here, so we'll use a placeholder structure.
+            # Replace with actual call if 'process_inline_formatting' is available.
+            
+            # Placeholder for rich_text_array (simple text without specific formatting)
+            rich_text_array = [{"type": "text", "text": {"content": cell_content}}]
+            # If a real process_inline_formatting function were available:
+            # rich_text_array = process_inline_formatting(cell_content) 
+            
+            notion_cells.append(rich_text_array)
+
+        # Build Notion table_row block (Notion API row structure)
+        row_block = {
+            "object": "block",
+            "type": "table_row",
+            "table_row": {
+                "cells": notion_cells
+            }
+        }
+        table_rows.append(row_block)
+
+    # 5. Calculate column count (count_column = len(split_column[0].split('|')))
+    if not table_rows:
+         return None
+
+    num_columns = len(table_rows[0]['table_row']['cells'])
+
+    # 6. Final encapsulation into Table Block (add_table = f"\\begin{array}...")
+    final_table_block = {
+        "object": "block",
+        "type": "table",
+        "table": {
+            "table_width": num_columns,
+            "has_column_header": has_header_row, # Added based on common Notion structure
+            "children": table_rows
+        }
+    }
+
+    return final_table_block
+
+def parse_markdown_to_notion_blocks(markdown, is_latex_table=True):
     """
     Parse Markdown text and convert it into a list of Notion blocks.
 
@@ -322,15 +402,18 @@ def parse_markdown_to_notion_blocks(markdown):
             in_table = False
             # Process the current table
             table_str = "\n".join(current_table)
+            if is_latex_table:
             # katex
-            latex_table = convert_markdown_table_to_latex(table_str)
-            # Create Notion equation block with LaTeX table expression
-            equation_block = {
-                "type": "equation",
-                "equation": {
-                    "expression": latex_table
+                latex_table = convert_markdown_table_to_latex(table_str)
+                # Create Notion equation block with LaTeX table expression
+                equation_block = {
+                    "type": "equation",
+                    "equation": {
+                        "expression": latex_table
+                    }
                 }
-            }
+            else:
+                equation_block = convert_markdown_table_to_notion(table_str)
             blocks.append(equation_block)
             # Reset the current table
             current_table = []
@@ -547,15 +630,19 @@ def parse_markdown_to_notion_blocks(markdown):
     # If there's an unfinished table at the end of the lines, process it
     if in_table:
         table_str = "\n".join(current_table)
-        latex_table = convert_markdown_table_to_latex(table_str)
-        equation_block = {
-            "type": "equation",
-            "equation": {
-                "expression": latex_table
+        if is_latex_table:
+        # katex
+            latex_table = convert_markdown_table_to_latex(table_str)
+            equation_block = {
+                "type": "equation",
+                "equation": {
+                    "expression": latex_table
+                }
             }
-        }
+        else:
+            equation_block = convert_markdown_table_to_notion(table_str)
         blocks.append(equation_block)
-
+        
     # Add any remaining indented lines as a code block
     if indented_code_accumulator:
         code_block = '\n'.join(indented_code_accumulator)
@@ -567,6 +654,7 @@ def parse_markdown_to_notion_blocks(markdown):
                 "rich_text": [{"type": "text", "text": {"content": code_block}}]
             }
         })
+        
     # Final cleanup step: Remove all top-level 'indent' properties before returning
     def _clean_blocks(blocks):
         """Recursively removes the top-level 'indent' property from all blocks and their children."""
@@ -584,7 +672,7 @@ def parse_markdown_to_notion_blocks(markdown):
     blocks = _clean_blocks(blocks)
     return blocks
 
-def parse_md(markdown_text):
+def parse_md(markdown_text, is_latex_table=True):
     """
     Parse Markdown text and convert it into Notion blocks.
 
@@ -594,10 +682,10 @@ def parse_md(markdown_text):
     :rtype: list
     """
     # Parse the transformed Markdown to create Notion blocks
-    return parse_markdown_to_notion_blocks(markdown_text.strip())
+    return parse_markdown_to_notion_blocks(markdown_text.strip(), is_latex_table)
 
 
-def create_notion_page_from_md(markdown_text, title, parent_page_id, cover_url=''):
+def create_notion_page_from_md(markdown_text, title, parent_page_id, cover_url='', is_latex_table=True):
     """
     Create a Notion page from Markdown text.
 
@@ -641,7 +729,7 @@ def create_notion_page_from_md(markdown_text, title, parent_page_id, cover_url='
         })
 
     # Iterate through the parsed Markdown blocks and append them to the created page
-    for block in parse_md(markdown_text):
+    for block in parse_md(markdown_text, is_latex_table):
         notion.blocks.children.append(
             created_page["id"],
             children=[block]
