@@ -360,7 +360,7 @@ def parse_markdown_to_notion_blocks(markdown):
             else: # indent > current_indent
                 # Nested item, add it as a child of the previous item
                 # Check if previous item is a numbered list item that can have children
-                if stack[-1] and len(stack[-1]) > 0 and 'numbered_list_item' in stack[-1][-1]:
+                if len(stack[-1]) > 0 and 'numbered_list_item' in stack[-1][-1]:
                     if 'children' not in stack[-1][-1]['numbered_list_item']:
                         stack[-1][-1]['numbered_list_item']['children'] = []
                     stack[-1][-1]['numbered_list_item']['children'].append(item)
@@ -396,7 +396,7 @@ def parse_markdown_to_notion_blocks(markdown):
             else: # indent > current_indent
                 # Nested item, add it as a child of the previous item
                 # Check if previous item is a bulleted list item that can have children
-                if stack[-1] and len(stack[-1]) > 0 and 'bulleted_list_item' in stack[-1][-1]:
+                if len(stack[-1]) > 0 and 'bulleted_list_item' in stack[-1][-1]:
                     if 'children' not in stack[-1][-1]['bulleted_list_item']:
                         stack[-1][-1]['bulleted_list_item']['children'] = []
                     stack[-1][-1]['bulleted_list_item']['children'].append(item)
