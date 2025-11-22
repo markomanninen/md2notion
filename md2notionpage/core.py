@@ -547,6 +547,25 @@ def parse_md(markdown_text):
     return parse_markdown_to_notion_blocks(markdown_text.strip())
 
 
+# helper function for batching -> helps to split words safely before pushing to notion
+def split_text_safely(text, max_len=2000):
+    chunks = []
+    start = 0
+    while start < len(text):
+        end = min(start + max_len, len(text))
+        if end == len(text):
+            chunks.append(text[start:end])
+            break
+        
+        split_at = text.rfind(" ", start, end)
+        if split_at == -1:
+            split_at = end  # if no spaces found then hard cut
+
+        chunks.append(text[start:split_at])
+        start = split_at + 1
+    return chunks
+
+
 def create_notion_page_from_md(markdown_text, title, parent_page_id, cover_url=''):
     """
     Create a Notion page from Markdown text.
@@ -590,11 +609,38 @@ def create_notion_page_from_md(markdown_text, title, parent_page_id, cover_url='
             }
         })
 
-    # Iterate through the parsed Markdown blocks and append them to the created page
-    for block in parse_md(markdown_text):
-        notion.blocks.children.append(
-            created_page["id"],
-            children=[block]
-        )
 
-    return created_page["url"]
+    # final blocks with splitting applied
+    final_blocks = []
+
+    for block in parse_md(markdown_text):
+        if block["type"] == "paragraph":
+            text = block["paragraph"]["rich_text"][0]["text"]["content"]
+            if len(text) > 2000:
+                chunks = split_text_safely(text, 2000)
+                for chunk in chunks:
+                    new_block = {
+                        "object": "block",
+                        "type": "paragraph",
+                        "paragraph": {
+                            "rich_text": [{
+                                "type": "text",
+                                "text": {"content": chunk}
+                            }]
+                        }
+                    }
+                    final_blocks.append(new_block)
+                continue  # skip adding original oversized block
+
+        final_blocks.append(block)
+
+    # Batch upload blocks (Notion API limit: max 100 children per request).
+    batch = []
+    for block in final_blocks:
+        batch.append(block)
+        if len(batch) == 100:
+            notion.blocks.children.append(created_page["id"], children=batch)
+            batch = []
+    # Upload any remaining blocks
+    if batch:
+        notion.blocks.children.append(created_page["id"], children=batch)
