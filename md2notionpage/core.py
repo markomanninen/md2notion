@@ -29,8 +29,12 @@ Example Usage:
 import os, re, glob, base64, json
 from notion_client import Client
 from os import environ
+from copy import deepcopy
+
+
 
 # Initialize the Notion client
+
 notion = Client(auth=environ.get("NOTION_SECRET"))
 
 def replace_part(parts, pattern, replace_function):
@@ -547,24 +551,128 @@ def parse_md(markdown_text):
     return parse_markdown_to_notion_blocks(markdown_text.strip())
 
 
-# helper function for batching -> helps to split words safely before pushing to notion
-def split_text_safely(text, max_len=2000):
+
+def split_rich_text(rich_text_list, max_len=2000):
+    """
+    Split a Notion rich_text array into multiple chunks while preserving formatting.
+    Attempts to split on word boundaries and avoids breaking equations/mentions.
+    """
+
+    if not rich_text_list:
+        return []
+
+    def visible_text_of_segment(seg):
+        t = seg.get("type")
+        if t == "text":
+            return seg.get("text", {}).get("content", "") or seg.get("plain_text", "")
+        if t == "equation":
+            return seg.get("equation", {}).get("expression", "") or seg.get("plain_text", "")
+        if t == "mention":
+            return seg.get("plain_text", "") or ""
+        return seg.get("plain_text", "") or ""
+
+    def make_slice(seg, start_idx, end_idx):
+        new_seg = deepcopy(seg)
+        new_seg.setdefault("text", {})
+        original = seg.get("text", {}).get("content", "")
+        new_seg["text"]["content"] = original[start_idx:end_idx]
+        if "plain_text" in new_seg:
+            new_seg["plain_text"] = new_seg["text"]["content"]
+        return new_seg
+
+    def tokenize(text):
+        if text == "":
+            return [""]
+        tokens = re.findall(r'\S+\s*', text)
+        return tokens or [text]
+
     chunks = []
-    start = 0
-    while start < len(text):
-        end = min(start + max_len, len(text))
-        if end == len(text):
-            chunks.append(text[start:end])
-            break
-        
-        split_at = text.rfind(" ", start, end)
-        if split_at == -1:
-            split_at = end  # if no spaces found then hard cut
+    current = []
+    current_len = 0
 
-        chunks.append(text[start:split_at])
-        start = split_at + 1
+    for seg in rich_text_list:
+        seg_type = seg.get("type", "text")
+        seg_text = visible_text_of_segment(seg)
+        seg_len = len(seg_text)
+
+        # Non splittable types
+        if seg_type in ("equation", "mention"):
+            if current_len + seg_len <= max_len:
+                current.append(deepcopy(seg))
+                current_len += seg_len
+            else:
+                if current:
+                    chunks.append(current)
+                chunks.append([deepcopy(seg)])
+                current = []
+                current_len = 0
+            continue
+
+        # Text segments
+        if seg_type == "text":
+            text_content = seg.get("text", {}).get("content", "") or ""
+            tokens = tokenize(text_content)
+
+            for token in tokens:
+                t_len = len(token)
+
+                # Hard split oversized token
+                if t_len > max_len:
+                    if current:
+                        chunks.append(current)
+                        current = []
+                        current_len = 0
+
+                    start = 0
+                    while start < t_len:
+                        end = min(start + max_len, t_len)
+                        chunks.append([make_slice(seg, start, end)])
+                        start = end
+                    continue
+
+                # Fits in current chunk
+                if current_len + t_len <= max_len:
+                    offset = 0
+                    for t in tokens:
+                        if t is token:
+                            break
+                        offset += len(t)
+                    current.append(make_slice(seg, offset, offset + len(token)))
+                    current_len += t_len
+                    continue
+
+                # Does not fit -> flush current chunk
+                if current:
+                    chunks.append(current)
+                    current = []
+                    current_len = 0
+
+                # Add token to new chunk
+                offset = 0
+                for t in tokens:
+                    if t is token:
+                        break
+                    offset += len(t)
+                current.append(make_slice(seg, offset, offset + len(token)))
+                current_len += t_len
+
+            continue
+
+        # Fallback for unknown segment types
+        if current_len + seg_len <= max_len:
+            current.append(deepcopy(seg))
+            current_len += seg_len
+        else:
+            if current:
+                chunks.append(current)
+            chunks.append([deepcopy(seg)])
+            current = []
+            current_len = 0
+
+    if current:
+        chunks.append(current)
+
     return chunks
-
 
 def create_notion_page_from_md(markdown_text, title, parent_page_id, cover_url=''):
     """
@@ -610,37 +718,53 @@ def create_notion_page_from_md(markdown_text, title, parent_page_id, cover_url='
         })
 
 
-    # final blocks with splitting applied
+
     final_blocks = []
 
     for block in parse_md(markdown_text):
         if block["type"] == "paragraph":
-            text = block["paragraph"]["rich_text"][0]["text"]["content"]
-            if len(text) > 2000:
-                chunks = split_text_safely(text, 2000)
-                for chunk in chunks:
-                    new_block = {
+            rich_text_list = block["paragraph"].get("rich_text", [])
+
+            # Computing total visible chars across all segments
+            total_visible = sum(
+                len(
+                    rt.get("text", {}).get("content", "")
+                    if rt.get("type") == "text"
+                    else rt.get("equation", {}).get("expression", "")
+                    if rt.get("type") == "equation"
+                    else rt.get("plain_text", "")
+                )
+                for rt in rich_text_list
+            )
+
+            if total_visible > 2000:
+
+                chunks = split_rich_text(rich_text_list, 2000)
+
+                for rich_chunk in chunks:
+                    final_blocks.append({
                         "object": "block",
                         "type": "paragraph",
-                        "paragraph": {
-                            "rich_text": [{
-                                "type": "text",
-                                "text": {"content": chunk}
-                            }]
-                        }
-                    }
-                    final_blocks.append(new_block)
-                continue  # skip adding original oversized block
+                        "paragraph": {"rich_text": rich_chunk}
+                    })
 
+                continue  # skip original block
+
+        # block does NOT need splitting -> keep as it is
         final_blocks.append(block)
 
-    # Batch upload blocks (Notion API limit: max 100 children per request).
+
+    # Notion API batching limit: 100 children per request
     batch = []
     for block in final_blocks:
         batch.append(block)
         if len(batch) == 100:
             notion.blocks.children.append(created_page["id"], children=batch)
             batch = []
-    # Upload any remaining blocks
+
+    # upload remaining batch
     if batch:
         notion.blocks.children.append(created_page["id"], children=batch)
+
+    # Return documented URL
+    return created_page["url"]

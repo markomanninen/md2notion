@@ -164,5 +164,5 @@ __pycache__
 *.vectorized_metadata
 *.vectorized_content
 .tmp/
-__pycache__/
+
 
