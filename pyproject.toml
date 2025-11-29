@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "md2notionpage"
+version = "0.1.6"
+description = "A package to convert Markdown text to Notion data structure and publish a new page under the parent page"
+authors = [
+  { name="Marko T. Manninen", email="elonmedia@gmail.com" },
+]
+readme = "README.md"
+requires-python = ">=3.7"
+dependencies = [
+    "notion-client",
+    "python-dotenv",
+]
+
+[project.scripts]
+md2notionpage = "md2notionpage.cli:main"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+]
+
