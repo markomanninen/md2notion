@@ -33,9 +33,9 @@ from copy import deepcopy
 
 
 
-# Initialize the Notion client
+# Initialize the Notion client (lazy initialization)
 
-notion = Client(auth=environ.get("NOTION_SECRET"))
+notion = None
 
 def replace_part(parts, pattern, replace_function):
     # Process italic matches
@@ -689,6 +689,9 @@ def create_notion_page_from_md(markdown_text, title, parent_page_id, cover_url='
     :return: The URL of the created Notion page.
     :rtype: str
     """
+    global notion
+    if notion is None:
+        notion = Client(auth=environ.get("NOTION_SECRET"))
 
     # Create a new child page under the parent page with the given title
     created_page = notion.pages.create(parent={

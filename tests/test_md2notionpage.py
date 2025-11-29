@@ -1,132 +1,157 @@
 
 import unittest
+from unittest.mock import patch, MagicMock, call
 from md2notionpage import md2notionpage
-from dotenv import load_dotenv, find_dotenv
-from os import environ
 from datetime import datetime
 
 class TestMd2NotionPage(unittest.TestCase):
 
-    @classmethod
-    def setUpClass(cls):
-        load_dotenv(find_dotenv())
+    def setUp(self):
+        # Common setup for all tests
+        self.parent_page_id = "test-parent-id"
+        self.cover_url = "https://example.com/cover.jpg"
+        self.timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        self.title = f"Test Page {self.timestamp}"
 
-    def test_create_notion_page_from_md(self):
+    @patch('md2notionpage.core.notion')
+    def test_create_complex_page_structure(self, mock_notion):
+        """
+        Test that a complex markdown document is correctly parsed and sent to Notion
+        via the expected API calls (create -> update -> append children).
+        """
+        # Setup mock return values
+        mock_page = {"id": "test-page-id", "url": "https://www.notion.so/test-page-url"}
+        mock_notion.pages.create.return_value = mock_page
+        mock_notion.pages.update.return_value = mock_page
+        mock_notion.blocks.children.append.return_value = {}
 
-        markdown_text = """
-# Otsikko 1
+        markdown_text = r"""
+# Main Title
 
-## Alaotsikko 1.1
+## Subtitle
 
-### Alaotsikko 1.1.1
+- Item 1
+- Item 2
 
-## Tehosteet
+1. Numbered 1
+2. Numbered 2
 
-Kappale, joka sisältää **lihavoitua** ja *kursivoitua* tekstiä.
-
-Kappale, joka sisältää __lihavoitua__ ja _kursivoitua_ tekstiä.
-
-Kappale, joka sisältää __*lihavoitua kursivoitua*__ tekstiä.
-
-Kappale, joka sisältää yliviivattua ~tekstiä~ ja inline `koodia`.
-
-Kappale, joka sisältää inline latex $x=y+1$ koodia.
-
-## Latex
-
-$$
-x = \sqrt{y^2 + z^2}
-$$
-
-## Numeroimaton lista
-
-- Ensimmäinen kohta
- - Alaluettelo
- - Toinen kohta
-  - Ala-alaluettelo
-  - Kolmas kohta
- - Neljäs kohta
-- Viides kohta
-
-## Numeroitu lista
-
-1. Ensimmäinen kohta
- 1. Alaluettelo
- 2. Toinen kohta
-  1. Ala-alaluettelo
-  2. Kolmas kohta
- 3. Neljäs kohta
-2. Viides kohta
-
-## Linkki
-
-[https://www.example.com](https://www.example.com)
-
-## Sisennys
-
-Tässä on sisennetty koodiesimerkki (plain text):
-
-    def hello_world():
-        print("Hello, world!")
-
-## Koodi
-
-Tässä on toinen koodiesimerkki (Python):
+> A quote
 
 ```python
-def hello_world2():
-    print("Hello, world2!")
+print("Hello")
 ```
 
-## Lainaus
+| Header 1 | Header 2 |
+|----------|----------|
+| Cell 1   | Cell 2   |
 
-> Lainausteksti
-
-## Taulukko
-
-Taulukko:
-
-| Sarake 1 | Sarake 2 | Sarake 3 |
-|----------|----------|----------|
-| Sisältö  | Sisältö  | Sisältö  |
-
-Taulukko ilman sarakenimiä:
-
-| Sisältö 1.1 | Sisältö 2.1 | Sisältö 3.1 |
-| Sisältö 1.2 | Sisältö 2.2 | Sisältö 3.2 |
-
-## Vaakaviiva
-
----
-
-## Kuva
-
-![Kuvateksti](https://raw.githubusercontent.com/markomanninen/md2notion/main/photo-1501504905252-473c47e087f8.jpeg)
-
-![](https://raw.githubusercontent.com/markomanninen/md2notion/main/photo-1501504905252-473c47e087f8.jpeg)
-
-Tämä on monipuolinen esimerkki, joka sisältää useimmat yleiset Markdown-elementit.
+![Image](https://example.com/image.png)
 """
+        # Execute
+        url = md2notionpage(markdown_text, self.title, self.parent_page_id, self.cover_url)
 
-        # Get the current date and time
-        current_time = datetime.now()
+        # 1. Verify Page Creation
+        mock_notion.pages.create.assert_called_once_with(
+            parent={"type": "page_id", "page_id": self.parent_page_id},
+            properties={},
+            children=[]
+        )
 
-        # Format the timestamp as a string
-        timestamp_str = current_time.strftime("%Y-%m-%d %H:%M:%S")
+        # 2. Verify Page Update (Title & Cover)
+        mock_notion.pages.update.assert_called_once()
+        update_call_args = mock_notion.pages.update.call_args
+        self.assertEqual(update_call_args[0][0], "test-page-id") # page_id
+        self.assertEqual(
+            update_call_args[1]['properties']['title']['title'][0]['text']['content'], 
+            self.title
+        )
+        self.assertEqual(
+            update_call_args[1]['cover']['external']['url'], 
+            self.cover_url
+        )
 
-        # Append the timestamp to the title
-        title = "Test Notion Page " + timestamp_str
+        # 3. Verify Content Appending
+        # We expect at least one call to blocks.children.append
+        self.assertTrue(mock_notion.blocks.children.append.called)
+        
+        # Inspect the blocks sent
+        append_call_args = mock_notion.blocks.children.append.call_args
+        self.assertEqual(append_call_args[0][0], "test-page-id") # page_id
+        children = append_call_args[1]['children']
+        
+        # We expect specific block types in order
+        expected_types = [
+            'heading_1', 
+            'heading_2', 
+            'bulleted_list_item', 'bulleted_list_item',
+            'numbered_list_item', 'numbered_list_item',
+            'quote',
+            'code',
+            'equation', # Table is converted to equation/latex
+            'image'
+        ]
+        
+        # Extract types from the actual call
+        actual_types = [
+            block.get('type') or block.get('object') # fallback for safety
+            for block in children
+        ]
+        
+        # Check if all expected types are present (we might have extra paragraphs or dividers)
+        for expected in expected_types:
+            self.assertIn(expected, actual_types)
 
-        parent_page_id = environ.get("NOTION_PARENT_PAGE_ID")
+        # Specific check for content
+        self.assertEqual(children[0]['heading_1']['rich_text'][0]['text']['content'], "Main Title")
+        self.assertEqual(children[7]['code']['rich_text'][0]['text']['content'], 'print("Hello")')
 
-        cover_url = "https://raw.githubusercontent.com/markomanninen/md2notion/main/photo-1501504905252-473c47e087f8.jpeg"
+        # 4. Verify Return Value
+        self.assertEqual(url, "https://www.notion.so/test-page-url")
 
-        # Call the md2notionpage function
-        notion_page_url = md2notionpage(markdown_text, title, parent_page_id, cover_url)
+    @patch('md2notionpage.core.notion')
+    def test_create_simple_page_no_cover(self, mock_notion):
+        """
+        Test creating a simple page without a cover image.
+        """
+        mock_page = {"id": "simple-page-id", "url": "https://notion.so/simple"}
+        mock_notion.pages.create.return_value = mock_page
+        
+        markdown_text = "Just some simple text."
+        
+        # Execute with empty cover_url
+        md2notionpage(markdown_text, "Simple Title", self.parent_page_id, "")
 
-        # Check that the returned URL is valid (this depends on how the function is implemented)
-        self.assertIsNotNone(notion_page_url)
-        self.assertTrue(notion_page_url.startswith('https://www.notion.so/'))
+        # Verify update call does NOT include cover
+        update_call_kwargs = mock_notion.pages.update.call_args[1]
+        self.assertNotIn('cover', update_call_kwargs)
+        self.assertEqual(
+            update_call_kwargs['properties']['title']['title'][0]['text']['content'], 
+            "Simple Title"
+        )
+
+    @patch('md2notionpage.core.notion')
+    def test_batching_logic(self, mock_notion):
+        """
+        Test that large content is split into batches of 100 blocks.
+        """
+        mock_notion.pages.create.return_value = {"id": "batch-page-id", "url": "url"}
+        
+        # Generate 150 lines of text, which should result in 150 paragraph blocks
+        markdown_text = "\n".join([f"Line {i}" for i in range(150)])
+        
+        md2notionpage(markdown_text, "Batch Test", self.parent_page_id)
+        
+        # Should be called twice: once for first 100, once for remaining 50
+        self.assertEqual(mock_notion.blocks.children.append.call_count, 2)
+        
+        # Verify first batch size
+        first_call = mock_notion.blocks.children.append.call_args_list[0]
+        self.assertEqual(len(first_call[1]['children']), 100)
+        
+        # Verify second batch size
+        second_call = mock_notion.blocks.children.append.call_args_list[1]
+        self.assertEqual(len(second_call[1]['children']), 50)
 
 if __name__ == '__main__':
     unittest.main()

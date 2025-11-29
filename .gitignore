@@ -165,4 +165,4 @@ __pycache__
 *.vectorized_content
 .tmp/
 
-
+.DS_Store
