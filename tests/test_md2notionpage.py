@@ -153,5 +153,171 @@ print("Hello")
         second_call = mock_notion.blocks.children.append.call_args_list[1]
         self.assertEqual(len(second_call[1]['children']), 50)
 
+    @patch('md2notionpage.core.notion')
+    def test_create_database_entry_with_auto_title_property(self, mock_notion):
+        """
+        Test creating a page as a database entry with default title property name.
+        """
+        mock_page = {"id": "db-entry-id", "url": "https://notion.so/db-entry"}
+        mock_notion.pages.create.return_value = mock_page
+        
+        markdown_text = "# Database Entry Content\n\nSome content here."
+        
+        # Execute with parent_type='database' (uses default title_property_name='Name')
+        url = md2notionpage(
+            markdown_text, 
+            "My Database Entry", 
+            "test-database-id",
+            parent_type='database'
+        )
+        
+        # Verify page creation with correct title property
+        create_call = mock_notion.pages.create.call_args
+        self.assertEqual(create_call[1]['parent'], {"database_id": "test-database-id"})
+        
+        # Check that the title property uses the default "Name"
+        properties = create_call[1]['properties']
+        self.assertIn("Name", properties)
+        self.assertEqual(
+            properties["Name"]["title"][0]["text"]["content"], 
+            "My Database Entry"
+        )
+        
+        # Verify return value
+        self.assertEqual(url, "https://notion.so/db-entry")
+
+    @patch('md2notionpage.core.notion')
+    def test_create_database_entry_with_custom_properties(self, mock_notion):
+        """
+        Test creating a database entry with custom properties provided.
+        """
+        mock_database_info = {
+            "id": "test-database-id",
+            "properties": {
+                "Task": {"type": "title"},
+                "Priority": {"type": "select"}
+            }
+        }
+        mock_notion.databases.retrieve.return_value = mock_database_info
+        
+        mock_page = {"id": "custom-entry-id", "url": "https://notion.so/custom"}
+        mock_notion.pages.create.return_value = mock_page
+        
+        # Custom properties including title
+        custom_properties = {
+            "Task": {"title": [{"text": {"content": "Complete project"}}]},
+            "Priority": {"select": {"name": "High"}},
+            "Due Date": {"date": {"start": "2026-12-31"}}
+        }
+        
+        markdown_text = "Task details here."
+        
+        url = md2notionpage(
+            markdown_text,
+            "Ignored Title",  # Should be ignored when properties provided
+            "test-database-id",
+            parent_type='database',
+            properties=custom_properties
+        )
+        
+        # Verify custom properties were used
+        create_call = mock_notion.pages.create.call_args
+        self.assertEqual(create_call[1]['properties'], custom_properties)
+        self.assertEqual(url, "https://notion.so/custom")
+
+    @patch('md2notionpage.core.notion')
+    def test_database_entry_creation_succeeds(self, mock_notion):
+        """
+        Test that database entry creation succeeds with default title property.
+        """
+        mock_page = {"id": "db-entry-id", "url": "https://notion.so/db-entry"}
+        mock_notion.pages.create.return_value = mock_page
+        
+        markdown_text = "Test content"
+        
+        # Should succeed using default title_property_name='Name'
+        url = md2notionpage(
+            markdown_text,
+            "Test Title",
+            "test-db-id",
+            parent_type='database'
+        )
+        
+        # Verify the page was created
+        self.assertEqual(url, "https://notion.so/db-entry")
+        create_call = mock_notion.pages.create.call_args
+        properties = create_call[1]['properties']
+        self.assertIn("Name", properties)
+
+    @patch('md2notionpage.core.notion')
+    def test_invalid_parent_type_raises_error(self, mock_notion):
+        """
+        Test that an invalid parent_type raises a ValueError.
+        """
+        markdown_text = "Test content"
+        
+        with self.assertRaises(ValueError) as context:
+            md2notionpage(
+                markdown_text,
+                "Test Title",
+                "some-id",
+                parent_type='invalid_type'
+            )
+        
+        self.assertIn("Unrecognized parent_type", str(context.exception))
+        self.assertIn("'invalid_type'", str(context.exception))
+
+    @patch('md2notionpage.core.notion')
+    @patch('md2notionpage.core.pprint.pprint')
+    def test_print_page_info_flag(self, mock_pprint, mock_notion):
+        """
+        Test that print_page_info flag triggers page info printing.
+        """
+        mock_page = {"id": "page-id", "url": "https://notion.so/page"}
+        mock_notion.pages.create.return_value = mock_page
+        
+        md2notionpage(
+            "Content",
+            "Title",
+            "parent-id",
+            print_page_info=True
+        )
+        
+        # Verify pprint was called with page info
+        mock_pprint.assert_called()
+        self.assertEqual(mock_pprint.call_args[0][0], mock_page)
+
+    @patch('md2notionpage.core.notion')
+    def test_create_database_entry_with_custom_title_property_name(self, mock_notion):
+        """
+        Test creating a database entry with a custom title property name.
+        """
+        mock_notion.databases.retrieve.return_value = {"id": "test-db"}
+        mock_page = {"id": "custom-title-entry-id", "url": "https://notion.so/custom-title"}
+        mock_notion.pages.create.return_value = mock_page
+        
+        markdown_text = "Test content with custom title property."
+        
+        url = md2notionpage(
+            markdown_text,
+            "My Custom Entry",
+            "test-db-id",
+            parent_type='database',
+            title_property_name='Task'  # Custom title property name
+        )
+        
+        # Verify page creation with custom title property name
+        create_call = mock_notion.pages.create.call_args
+        properties = create_call[1]['properties']
+        
+        # Should use "Task" not "Name"
+        self.assertIn("Task", properties)
+        self.assertNotIn("Name", properties)
+        self.assertEqual(
+            properties["Task"]["title"][0]["text"]["content"],
+            "My Custom Entry"
+        )
+        self.assertEqual(url, "https://notion.so/custom-title")
+
 if __name__ == '__main__':
     unittest.main()
