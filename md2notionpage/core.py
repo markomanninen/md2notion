@@ -719,17 +719,6 @@ def create_notion_page_from_md(markdown_text, title, parent_page_id, cover_url='
             database_info = notion.databases.retrieve(database_id=parent_page_id)
             pprint.pprint(database_info)
 
-            '''
-            # Query the first item in the database to see its property structure
-            sample_query = notion.databases.query(database_id="308873a4-bc66-81ef-aed0-eab7bb9b24fc", page_size=1)
-
-            if sample_query["results"]:
-                import pprint
-                pprint.pprint(sample_query["results"][0]["properties"])
-            else:
-                print("Database is empty. Add one row manually in Notion first to see the schema!")
-            '''
-
         if properties is None:
             properties={
                 "title": { # "title" assumed to be the name of the title property.
