@@ -674,7 +674,7 @@ def split_rich_text(rich_text_list, max_len=2000):
 
     return chunks
 
-def create_notion_page_from_md(markdown_text, title, parent_page_id, cover_url='', parent_type='page', properties=None, print_page_info=False, print_database_info=False):
+def create_notion_page_from_md(markdown_text, title, parent_page_id, cover_url='', parent_type='page', properties=None, title_property_name='Name', print_page_info=False):
     """
     Create a Notion page from Markdown text.
 
@@ -688,12 +688,12 @@ def create_notion_page_from_md(markdown_text, title, parent_page_id, cover_url='
     :type cover_url: str
     :param parent_type: (Optional) 'page' or 'database'
     :type parent_type: str
-    :param properties: (Optional) The page properties dictionary for parent_type='database'. If given, "title" argument is ignored. If not given, "title" assumed to be the name of the title property.
+    :param properties: (Optional) The page properties dictionary for parent_type='database'. If given, "title" argument is ignored. If not given, the title property name will be automatically determined from the database schema.
     :type properties: dict
+    :param title_property_name: (Optional) The name of the title property in the database. Defaults to 'Name'. Only used when parent_type='database' and properties=None.
+    :type title_property_name: str
     :param print_page_info: (Optional) False or True. Print info of the newly generated page.
     :type print_page_info: bool
-    :param print_database_info: (Optional) False or True. Print info of the database (n/a unless parent_type is "database").
-    :type print_database_info: bool
     :return: The URL of the created Notion page.
     :rtype: str
 
@@ -715,13 +715,11 @@ def create_notion_page_from_md(markdown_text, title, parent_page_id, cover_url='
             "page_id": parent_page_id
         }, properties={}, children=[])
     elif parent_type=='database':
-        if print_database_info:
-            database_info = notion.databases.retrieve(database_id=parent_page_id)
-            pprint.pprint(database_info)
-
         if properties is None:
+            # Use the provided title_property_name (defaults to "Name")
+            # Users can override this if their database uses a different name
             properties={
-                "title": { # "title" assumed to be the name of the title property.
+                title_property_name: {
                     "title": [{"text": {"content": title}}]
                 }
             }
