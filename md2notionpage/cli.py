@@ -13,10 +13,10 @@ def main():
     parser.add_argument('markdown_file', type=str, help='Path to the Markdown file to convert.')
     parser.add_argument('parent_page_id', nargs='?', help='ID of the parent Notion page. If not provided, uses NOTION_PARENT_PAGE_ID env var.')
     parser.add_argument('--title', type=str, help='Title for the Notion page (optional).')
+    parser.add_argument('--title_property_name', type=str, default='Name', help='The name of the title property in the database. Defaults to "Name". (optional).')
     parser.add_argument('--cover_url', type=str, default='', help='Cover URL for the Notion page (optional).')
     parser.add_argument('--parent_type', type=str.lower, choices=['page', 'database'], default='page', help='"page" or "database"')
     parser.add_argument('--print_page_info', action='store_true', help='Print info about the newly created page')
-    parser.add_argument('--print_database_info', action='store_true', help='Print info about the database (n/a unless parent_type is "database")')
 
     args = parser.parse_args()
 
@@ -45,7 +45,7 @@ def main():
 
         # Create the Notion page
         notion_page_url = md2notionpage(markdown_content, title, parent_page_id, cover_url=args.cover_url, parent_type=args.parent_type, 
-                                        print_page_info=args.print_page_info, print_database_info=args.print_database_info)
+                                        print_page_info=args.print_page_info, title_property_name=args.title_property_name)
         print(f'Notion page created: {notion_page_url}')
 
     except APIResponseError as e:
