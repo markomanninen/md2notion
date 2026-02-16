@@ -730,7 +730,9 @@ def create_notion_page_from_md(markdown_text, title, parent_page_id, cover_url='
             properties=properties
         )
     else:
-        raise Exception("Unrecognized parent_type")
+        raise ValueError(
+            f"Unrecognized parent_type: {parent_type!r}. Expected 'page' or 'database'."
+        )
 
     if cover_url != "":
         # Update the page with the title and cover (if provided)
