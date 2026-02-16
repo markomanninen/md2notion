@@ -8,6 +8,7 @@ A Python package to convert Markdown text into Notion pages. This module provide
 - Rich Markdown support - Headers, lists, code blocks, tables, images, and more
 - Smart text splitting - Automatically handles Notion's 2000-character limit
 - Batch processing - Efficiently handles large documents with 100+ blocks
+- Database entries - Create entries in Notion databases with configurable title property
 - Cover images - Optional cover image support
 - CLI & Python API - Use as a command-line tool or import as a module
 - Helpful error messages - Clear guidance for common issues
@@ -111,6 +112,50 @@ notion_page_url = md2notionpage(
     cover_url="https://images.unsplash.com/photo-123..."
 )
 ```
+
+### Creating Database Entries
+
+You can also create entries in a Notion database instead of sub-pages:
+
+```python
+from md2notionpage import md2notionpage
+
+markdown_text = "Task description with **rich** formatting..."
+title = "My Task"
+database_id = "YOUR_DATABASE_ID"
+
+# Basic usage - uses the default title property "Name"
+url = md2notionpage(
+    markdown_text,
+    title,
+    database_id,
+    parent_type='database'
+)
+
+# If your database title property has a different name (e.g., "Task")
+url = md2notionpage(
+    markdown_text,
+    title,
+    database_id,
+    parent_type='database',
+    title_property_name='Task'
+)
+
+# With custom properties (for databases with additional fields)
+url = md2notionpage(
+    markdown_text,
+    title,
+    database_id,
+    parent_type='database',
+    properties={
+        "Name": {"title": [{"text": {"content": "My Task"}}]},
+        "Status": {"select": {"name": "In Progress"}},
+        "Priority": {"number": 1}
+    }
+)
+```
+
+**Note**: The `title_property_name` parameter defaults to `'Name'` which matches Notion's default. If your database uses a custom name for the title property (e.g., "Task", "Item", "Title"), specify it with `title_property_name`.
 
 ## Supported Markdown Features
 
