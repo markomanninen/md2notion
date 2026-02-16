@@ -14,7 +14,7 @@ def main():
     parser.add_argument('parent_page_id', nargs='?', help='ID of the parent Notion page. If not provided, uses NOTION_PARENT_PAGE_ID env var.')
     parser.add_argument('--title', type=str, help='Title for the Notion page (optional).')
     parser.add_argument('--cover_url', type=str, default='', help='Cover URL for the Notion page (optional).')
-    parser.add_argument('--parent_type', type=str, default='page', help='"page" or "database"')
+    parser.add_argument('--parent_type', type=str.lower, choices=['page', 'database'], default='page', help='"page" or "database"')
     parser.add_argument('--print_page_info', action='store_true', help='Print info about the newly created page')
     parser.add_argument('--print_database_info', action='store_true', help='Print info about the database (n/a unless parent_type is "database")')
 
