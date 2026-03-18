@@ -57,8 +57,8 @@ class TestSplittingAndBatching(unittest.TestCase):
 
         # Patch the global notion client inside the module
         with patch("md2notionpage.core.notion", fake_notion):
-            # Create 250 simple paragraphs
-            big_md = "\n".join("Line " + str(i) for i in range(250))
+            # Create 250 simple paragraphs using double newlines
+            big_md = "\n\n".join("Line " + str(i) for i in range(250))
 
             md2notionpage(big_md, "batch-test", "parent123", "")
 

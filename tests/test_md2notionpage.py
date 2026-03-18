@@ -137,8 +137,8 @@ print("Hello")
         """
         mock_notion.pages.create.return_value = {"id": "batch-page-id", "url": "url"}
         
-        # Generate 150 lines of text, which should result in 150 paragraph blocks
-        markdown_text = "\n".join([f"Line {i}" for i in range(150)])
+        # Generate 150 lines of text with double newlines, which should result in 150 paragraph blocks
+        markdown_text = "\n\n".join([f"Line {i}" for i in range(150)])
         
         md2notionpage(markdown_text, "Batch Test", self.parent_page_id)
         
