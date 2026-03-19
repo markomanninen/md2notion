@@ -75,6 +75,23 @@ class NotionBlockConverter:
 
         elif token_type == 'paragraph':
             children = token.get('children', [])
+
+            # Check for standalone math in the form of misparsed $$math$$
+            # This happens when mistune math plugin parses $$ as $ + $
+            if (len(children) == 2 and 
+                children[0]['type'] == 'inline_math' and 
+                children[0]['raw'].startswith('$') and
+                children[1]['type'] == 'text' and 
+                children[1]['raw'] == '$'):
+                
+                return {
+                    "object": "block",
+                    "type": "equation",
+                    "equation": {
+                        "expression": children[0]['raw'][1:].strip()
+                    }
+                }
+
             # If paragraph contains ONLY an image (or image + whitespace), render it as an image block
             # This is common in standalone image lines
             inlines_only_image = [t for t in children if t['type'] != 'text' or t['raw'].strip()]
@@ -246,13 +263,41 @@ class NotionBlockConverter:
 
     def render_inlines(self, tokens):
         rich_texts = []
-        for token in tokens:
+        i = 0
+        while i < len(tokens):
+            token = tokens[i]
+            
+            # Check for misparsed inline $$math$$ (Mistune 3.x math plugin issue)
+            if (token['type'] == 'inline_math' and 
+                token['raw'].startswith('$') and 
+                i + 1 < len(tokens) and 
+                tokens[i+1]['type'] == 'text' and 
+                tokens[i+1]['raw'].startswith('$')):
+                
+                # Render fixed math token
+                # render_inline(inline_math) will strip leading $ automatically now
+                rendered_math = self.render_inline(token)
+                if rendered_math:
+                    rich_texts.append(rendered_math)
+                
+                # Render fixed next text token
+                remaining_text = tokens[i+1]['raw'][1:]
+                if remaining_text:
+                    fixed_text = {**tokens[i+1], 'raw': remaining_text}
+                    rendered_text = self.render_inline(fixed_text)
+                    if rendered_text:
+                        rich_texts.append(rendered_text)
+                
+                i += 2 # Skip next text token
+                continue
+
             rendered = self.render_inline(token)
             if rendered:
                 if isinstance(rendered, list):
                     rich_texts.extend(rendered)
                 else:
                     rich_texts.append(rendered)
+            i += 1
         return rich_texts
 
     def render_inline(self, token):
@@ -317,10 +362,14 @@ class NotionBlockConverter:
             return content
 
         elif token_type == 'inline_math':
+            expression = token['raw'].strip()
+            # If it starts with $, it might be a misparsed $$ inline
+            if expression.startswith('$'):
+                expression = expression[1:]
             return {
                 "type": "equation",
                 "equation": {
-                    "expression": token['raw'].strip()
+                    "expression": expression
                 }
             }
         
