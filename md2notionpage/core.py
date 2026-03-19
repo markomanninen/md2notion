@@ -20,7 +20,7 @@ Environment Variables:
     - NOTION_SECRET: Authentication token for the Notion API.
 """
 
-import os, re, glob, base64, json, pprint
+import os, re, pprint
 import mistune
 from mistune.plugins.math import math
 from mistune.plugins.table import table
@@ -160,18 +160,34 @@ class NotionBlockConverter:
                 return block
 
         elif token_type == 'block_quote':
-            return {
+            # Mistune gives block-level children (paragraphs, etc.) inside a blockquote.
+            # Extract inlines from the first paragraph child; render remaining as nested children.
+            children = token.get('children', [])
+            rich_text = []
+            nested_blocks = []
+            for i, child in enumerate(children):
+                if i == 0 and child['type'] in ('paragraph', 'block_text'):
+                    rich_text = self.render_inlines(child.get('children', []))
+                else:
+                    rendered = self.render_block(child)
+                    if rendered:
+                        if isinstance(rendered, list):
+                            nested_blocks.extend(rendered)
+                        else:
+                            nested_blocks.append(rendered)
+            block = {
                 "object": "block",
                 "type": "quote",
                 "quote": {
-                    "rich_text": self.render_inlines(token.get('children', []))
+                    "rich_text": rich_text
                 }
             }
+            if nested_blocks:
+                block["quote"]["children"] = nested_blocks
+            return block
 
         elif token_type == 'block_code':
-            language = token['attrs'].get('info', 'plain text')
-            if not language:
-                language = 'plain text'
+            language = (token.get('attrs') or {}).get('info', 'plain text') or 'plain text'
             # Notion language map (approximate)
             lang_map = {
                 'py': 'python',
@@ -199,6 +215,7 @@ class NotionBlockConverter:
 
         elif token_type == 'block_math':
             return {
+                "object": "block",
                 "type": "equation",
                 "equation": {
                     "expression": token['raw'].strip()
@@ -208,6 +225,7 @@ class NotionBlockConverter:
         elif token_type == 'table':
             latex_table = self.convert_table_token_to_latex(token)
             return {
+                "object": "block",
                 "type": "equation",
                 "equation": {
                     "expression": latex_table
