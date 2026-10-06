@@ -22,7 +22,7 @@ Environment Variables:
 
 import os, re, pprint
 import mistune
-from mistune.plugins.math import math
+from mistune.plugins.math import math, parse_inline_math
 from mistune.plugins.table import table
 from mistune.plugins.formatting import strikethrough
 from mistune.plugins.task_lists import task_lists
@@ -33,12 +33,24 @@ from copy import deepcopy
 # Initialize the Notion client (lazy initialization)
 notion = None
 
+# mistune's inline math pattern, except that the closing $ must not follow
+# whitespace (Pandoc rule), so "$5 and $10, formula $x$" keeps the prices as text
+INLINE_MATH_PATTERN = (
+    r"\$\$(?P<display_math_text>(?:[^$\\]|\\.)*?)\$\$|"
+    r"\$(?P<backtick_math_marker>`+)(?P<backtick_math_text>[\s\S]*?)(?P=backtick_math_marker)\$|"
+    r"\$(?!\$)(?!\s)(?P<math_text>(?:[^$\\\n]|\\.)+?)(?<!\s)\$(?!\d)"
+)
+
+def strict_math(md):
+    math(md)
+    md.inline.register("inline_math", INLINE_MATH_PATTERN, parse_inline_math, before="codespan")
+
 class NotionBlockConverter:
     def __init__(self):
         # Create a mistune Markdown instance with plugins
         self.md = mistune.create_markdown(
             renderer=None,
-            plugins=[math, table, strikethrough, task_lists]
+            plugins=[strict_math, table, strikethrough, task_lists]
         )
 
     def parse(self, markdown):

@@ -450,5 +450,29 @@ class TestTableToNotion(unittest.TestCase):
         self.assertEqual(row2['cells'][2][0]['text']['content'], "3")
 
 
+class TestInlineMath(unittest.TestCase):
+    """Tests for inline math vs. dollar amounts."""
+
+    def _rich_text(self, markdown):
+        from md2notionpage.core import NotionBlockConverter
+        block = NotionBlockConverter().parse(markdown)[0]
+        return [(rt['type'], rt['text']['content'] if rt['type'] == 'text' else rt['equation']['expression'])
+                for rt in block['paragraph']['rich_text']]
+
+    def test_dollar_amounts_before_inline_math(self):
+        self.assertEqual(
+            self._rich_text("Price $5 and $10, formula $E = mc^2$ works."),
+            [('text', 'Price $5 and $10, formula '), ('equation', 'E = mc^2'), ('text', ' works.')]
+        )
+
+    def test_dollar_amounts_only(self):
+        self.assertEqual(self._rich_text("Price $5 and $10."), [('text', 'Price $5 and $10.')])
+
+    def test_inline_math(self):
+        self.assertEqual(
+            self._rich_text("Both $x$ and $2y$."),
+            [('text', 'Both '), ('equation', 'x'), ('text', ' and '), ('equation', '2y'), ('text', '.')]
+        )
+
 if __name__ == '__main__':
     unittest.main()
