@@ -88,7 +88,7 @@ print("Hello")
             'numbered_list_item', 'numbered_list_item',
             'quote',
             'code',
-            'equation', # Table is converted to equation/latex
+            'table', # Table is converted to native table
             'image'
         ]
         
@@ -105,6 +105,20 @@ print("Hello")
         # Specific check for content
         self.assertEqual(children[0]['heading_1']['rich_text'][0]['text']['content'], "Main Title")
         self.assertEqual(children[7]['code']['rich_text'][0]['text']['content'], 'print("Hello")')
+
+        # Check table properties and cells
+        table_block = [b for b in children if b.get('type') == 'table'][0]
+        self.assertEqual(table_block['table']['table_width'], 2)
+        self.assertEqual(table_block['table']['has_column_header'], True)
+        self.assertEqual(len(table_block['table']['children']), 2)
+
+        header_row = table_block['table']['children'][0]['table_row']
+        self.assertEqual(header_row['cells'][0][0]['text']['content'], "Header 1")
+        self.assertEqual(header_row['cells'][1][0]['text']['content'], "Header 2")
+
+        body_row = table_block['table']['children'][1]['table_row']
+        self.assertEqual(body_row['cells'][0][0]['text']['content'], "Cell 1")
+        self.assertEqual(body_row['cells'][1][0]['text']['content'], "Cell 2")
 
         # 4. Verify Return Value
         self.assertEqual(url, "https://www.notion.so/test-page-url")
@@ -137,8 +151,8 @@ print("Hello")
         """
         mock_notion.pages.create.return_value = {"id": "batch-page-id", "url": "url"}
         
-        # Generate 150 lines of text, which should result in 150 paragraph blocks
-        markdown_text = "\n".join([f"Line {i}" for i in range(150)])
+        # Generate 150 lines of text with double newlines, which should result in 150 paragraph blocks
+        markdown_text = "\n\n".join([f"Line {i}" for i in range(150)])
         
         md2notionpage(markdown_text, "Batch Test", self.parent_page_id)
         
@@ -318,6 +332,123 @@ print("Hello")
             "My Custom Entry"
         )
         self.assertEqual(url, "https://notion.so/custom-title")
+
+class TestTableToNotion(unittest.TestCase):
+    """Tests for native Notion table conversion."""
+
+    def _parse_table_md(self, markdown):
+        from md2notionpage.core import NotionBlockConverter
+        converter = NotionBlockConverter()
+        blocks = converter.parse(markdown)
+        table_blocks = [b for b in blocks if b.get('type') == 'table']
+        self.assertEqual(len(table_blocks), 1, "Expected exactly one table block from table")
+        return table_blocks[0]['table']
+
+    def test_basic_table_conversion(self):
+        md = (
+            "| Header A | Header B |\n"
+            "|----------|----------|\n"
+            "| **Bold** | *Italic* |\n"
+        )
+        table = self._parse_table_md(md)
+        self.assertEqual(table['table_width'], 2)
+        self.assertEqual(table['has_column_header'], True)
+        self.assertEqual(len(table['children']), 2)
+        
+        # Check header
+        header_row = table['children'][0]['table_row']
+        self.assertEqual(header_row['cells'][0][0]['text']['content'], "Header A")
+        self.assertEqual(header_row['cells'][1][0]['text']['content'], "Header B")
+
+        # Check cells with inline formatting
+        body_row = table['children'][1]['table_row']
+        self.assertEqual(body_row['cells'][0][0]['text']['content'], "Bold")
+        self.assertTrue(body_row['cells'][0][0]['annotations']['bold'])
+        self.assertEqual(body_row['cells'][1][0]['text']['content'], "Italic")
+        self.assertTrue(body_row['cells'][1][0]['annotations']['italic'])
+
+    def test_dollar_sign_in_cell_is_not_escaped(self):
+        """Bare $ in a table cell does not need KaTeX escaping in native tables."""
+        md = (
+            "| Tool | MRR |\n"
+            "|------|-----|\n"
+            "| Copy to Notion | ~$100 MRR |\n"
+        )
+        table = self._parse_table_md(md)
+        body_row = table['children'][1]['table_row']
+        cell_tool = body_row['cells'][0][0]['text']['content']
+        self.assertEqual(cell_tool, "Copy to Notion")
+        
+        cell_mrr = body_row['cells'][1][0]['text']['content']
+        self.assertEqual(cell_mrr, "~$100 MRR")
+
+    def test_footnote_reference_in_cell(self):
+        """[^N] footnote refs do not break native tables and are preserved as text/rich text."""
+        md = (
+            "| Tool | Notes |\n"
+            "|------|-------|\n"
+            "| foo  | bar [^18] |\n"
+        )
+        table = self._parse_table_md(md)
+        body_row = table['children'][1]['table_row']
+        cell_notes_list = body_row['cells'][1]
+        cell_notes = "".join(rt['text']['content'] for rt in cell_notes_list)
+        self.assertEqual(cell_notes, "bar [^18]")
+
+    def test_column_count_mismatch_alignment(self):
+        """Table cells must be aligned to the declared column count (pad / truncate)."""
+        from md2notionpage.core import NotionBlockConverter
+        converter = NotionBlockConverter()
+        
+        # Manually craft a token with mismatched column counts
+        token = {
+            'type': 'table',
+            'children': [
+                {
+                    'type': 'table_head',
+                    'children': [
+                        {'type': 'table_cell', 'children': [{'type': 'text', 'raw': 'A'}]},
+                        {'type': 'table_cell', 'children': [{'type': 'text', 'raw': 'B'}]},
+                        {'type': 'table_cell', 'children': [{'type': 'text', 'raw': 'C'}]}
+                    ]
+                },
+                {
+                    'type': 'table_body',
+                    'children': [
+                        {
+                            'type': 'table_row',
+                            'children': [
+                                {'type': 'table_cell', 'children': [{'type': 'text', 'raw': '1'}]},
+                                {'type': 'table_cell', 'children': [{'type': 'text', 'raw': '2'}]}
+                            ]
+                        },
+                        {
+                            'type': 'table_row',
+                            'children': [
+                                {'type': 'table_cell', 'children': [{'type': 'text', 'raw': '1'}]},
+                                {'type': 'table_cell', 'children': [{'type': 'text', 'raw': '2'}]},
+                                {'type': 'table_cell', 'children': [{'type': 'text', 'raw': '3'}]},
+                                {'type': 'table_cell', 'children': [{'type': 'text', 'raw': '4'}]}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+        
+        block = converter.convert_table_token_to_notion(token)
+        table = block['table']
+        self.assertEqual(table['table_width'], 3)
+        self.assertEqual(len(table['children']), 3) # 1 header row + 2 body rows
+        
+        row1 = table['children'][1]['table_row']
+        self.assertEqual(len(row1['cells']), 3) # padded
+        self.assertEqual(row1['cells'][2], []) # empty cell
+
+        row2 = table['children'][2]['table_row']
+        self.assertEqual(len(row2['cells']), 3) # truncated
+        self.assertEqual(row2['cells'][2][0]['text']['content'], "3")
+
 
 if __name__ == '__main__':
     unittest.main()
