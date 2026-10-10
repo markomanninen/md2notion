@@ -33,6 +33,40 @@ from copy import deepcopy
 # Initialize the Notion client (lazy initialization)
 notion = None
 
+_FENCE_RE = re.compile(r'^([ \t]*)(`{3,}|~{3,})[^\n]*\n.*?^\1\2[ \t]*$', re.M | re.S)
+_CODE_SPAN_RE = re.compile(r'(`+)(?!`).+?(?<!`)\1(?!`)', re.S)
+# Display math \[ ... \] (also tolerates doubled backslashes, e.g. "\\[ ... \\]")
+_DISPLAY_MATH_RE = re.compile(r'\\{1,2}\[(.+?)\\{1,2}\]', re.S)
+# Inline math \( ... \)
+_INLINE_MATH_RE = re.compile(r'\\{1,2}\((.+?)\\{1,2}\)')
+
+
+def normalize_latex_delimiters(markdown):
+    """Rewrite LaTeX \\[...\\] and \\(...\\) delimiters to $$...$$ and $...$,
+    leaving fenced code blocks and inline code spans untouched."""
+    def convert(text):
+        out, pos = [], 0
+        for m in _CODE_SPAN_RE.finditer(text):
+            out.append(_convert_math(text[pos:m.start()]))
+            out.append(m.group(0))
+            pos = m.end()
+        out.append(_convert_math(text[pos:]))
+        return ''.join(out)
+
+    out, pos = [], 0
+    for m in _FENCE_RE.finditer(markdown):
+        out.append(convert(markdown[pos:m.start()]))
+        out.append(m.group(0))
+        pos = m.end()
+    out.append(convert(markdown[pos:]))
+    return ''.join(out)
+
+
+def _convert_math(text):
+    text = _DISPLAY_MATH_RE.sub(lambda m: '$$' + m.group(1).strip() + '$$', text)
+    return _INLINE_MATH_RE.sub(lambda m: '$' + m.group(1).strip() + '$', text)
+
+
 # mistune's inline math pattern, except that the closing $ must not follow
 # whitespace (Pandoc rule), so "$5 and $10, formula $x$" keeps the prices as text
 INLINE_MATH_PATTERN = (
@@ -55,7 +89,7 @@ class NotionBlockConverter:
 
     def parse(self, markdown):
         # mistune 3.x returns (tokens, state)
-        tokens, _ = self.md.parse(markdown)
+        tokens, _ = self.md.parse(normalize_latex_delimiters(markdown))
         return self.render_blocks(tokens)
 
     def render_blocks(self, tokens):
@@ -101,6 +135,18 @@ class NotionBlockConverter:
                     "type": "equation",
                     "equation": {
                         "expression": children[0]['raw'][1:].strip()
+                    }
+                }
+
+            # A paragraph consisting solely of $$math$$ (mistune emits it as an
+            # inline block_math token when it isn't on its own lines)
+            non_blank = [t for t in children if t['type'] != 'text' or t['raw'].strip()]
+            if len(non_blank) == 1 and non_blank[0]['type'] == 'block_math':
+                return {
+                    "object": "block",
+                    "type": "equation",
+                    "equation": {
+                        "expression": non_blank[0]['raw'].strip()
                     }
                 }
 
@@ -366,6 +412,15 @@ class NotionBlockConverter:
                     item['href'] = url
             return content
 
+        elif token_type == 'block_math':
+            # $$math$$ embedded in running text / list items / quotes
+            return {
+                "type": "equation",
+                "equation": {
+                    "expression": token['raw'].strip()
+                }
+            }
+
         elif token_type == 'inline_math':
             expression = token['raw'].strip()
             # If it starts with $, it might be a misparsed $$ inline
@@ -527,7 +582,7 @@ class NotionBlockConverter:
 
 def process_inline_formatting(text):
     converter = NotionBlockConverter()
-    tokens, _ = converter.md.parse(text)
+    tokens, _ = converter.md.parse(normalize_latex_delimiters(text))
     if tokens and tokens[0]['type'] == 'paragraph':
         return converter.render_inlines(tokens[0].get('children', []))
     return converter.render_inlines(tokens)

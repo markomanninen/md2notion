@@ -474,5 +474,45 @@ class TestInlineMath(unittest.TestCase):
             [('text', 'Both '), ('equation', 'x'), ('text', ' and '), ('equation', '2y'), ('text', '.')]
         )
 
+    def test_inline_display_math(self):
+        """$$...$$ inside running text must not be dropped."""
+        self.assertEqual(
+            self._rich_text("Intro $$ a+b $$ end"),
+            [('text', 'Intro '), ('equation', 'a+b'), ('text', ' end')]
+        )
+
+    def test_latex_inline_delimiters(self):
+        self.assertEqual(
+            self._rich_text(r"Let \(x_1\) be given."),
+            [('text', 'Let '), ('equation', 'x_1'), ('text', ' be given.')]
+        )
+
+
+class TestLatexDisplayMath(unittest.TestCase):
+    """\\[...\\] and standalone $$...$$ become Notion equation blocks."""
+
+    def _parse(self, markdown):
+        from md2notionpage.core import NotionBlockConverter
+        return NotionBlockConverter().parse(markdown)
+
+    def test_bracket_display_math(self):
+        for md in (r"\[ x_t=(1-t)\epsilon+tx_1 \]", r"\\[ x_t=(1-t)\epsilon+tx_1 \\]"):
+            self.assertEqual(
+                self._parse(md),
+                [{"object": "block", "type": "equation",
+                  "equation": {"expression": r"x_t=(1-t)\epsilon+tx_1"}}]
+            )
+
+    def test_multiline_bracket_display_math(self):
+        blocks = self._parse("Text\n\\[\nx_t=(1-t)\\epsilon\n\\]\nmore")
+        self.assertEqual([b['type'] for b in blocks], ['paragraph', 'equation', 'paragraph'])
+        self.assertEqual(blocks[1]['equation']['expression'], r"x_t=(1-t)\epsilon")
+
+    def test_code_is_untouched(self):
+        blocks = self._parse("```\n\\[ fenced \\]\n```")
+        self.assertEqual(blocks[0]['code']['rich_text'][0]['text']['content'], "\\[ fenced \\]")
+        blocks = self._parse("`\\[ span \\]`")
+        self.assertEqual(blocks[0]['paragraph']['rich_text'][0]['text']['content'], "\\[ span \\]")
+
 if __name__ == '__main__':
     unittest.main()
